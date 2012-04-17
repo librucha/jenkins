@@ -48,6 +48,7 @@ import hudson.util.XStream2;
 import jenkins.RestartRequiredException;
 import jenkins.model.Jenkins;
 import org.acegisecurity.Authentication;
+import org.acegisecurity.context.SecurityContext;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.NullOutputStream;
 import org.jvnet.localizer.Localizable;
@@ -82,6 +83,7 @@ import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acegisecurity.context.SecurityContextHolder;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 
 
 /**
@@ -281,8 +283,8 @@ public class UpdateCenter extends AbstractModelObject implements Saveable {
     /**
      * Schedules a Jenkins upgrade.
      */
+    @RequirePOST
     public void doUpgrade(StaplerResponse rsp) throws IOException, ServletException {
-        requirePOST();
         Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
         HudsonUpgradeJob job = new HudsonUpgradeJob(getCoreSource(), Jenkins.getAuthentication());
         if(!Lifecycle.get().canRewriteHudsonWar()) {
@@ -367,8 +369,8 @@ public class UpdateCenter extends AbstractModelObject implements Saveable {
     /**
      * Performs hudson downgrade.
      */
+    @RequirePOST
     public void doDowngrade(StaplerResponse rsp) throws IOException, ServletException {
-        requirePOST();
         Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
         if(!isDowngradable()) {
             sendError("Jenkins downgrade is not possible, probably backup does not exist");
@@ -1120,13 +1122,14 @@ public class UpdateCenter extends AbstractModelObject implements Saveable {
 
             // if this is a bundled plugin, make sure it won't get overwritten
             PluginWrapper pw = plugin.getInstalled();
-            if (pw!=null && pw.isBundled())
+            if (pw!=null && pw.isBundled()) {
+                SecurityContext oldContext = ACL.impersonate(ACL.SYSTEM);
                 try {
-                    SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
                     pw.doPin();
                 } finally {
-                    SecurityContextHolder.clearContext();
+                    SecurityContextHolder.setContext(oldContext);
                 }
+            }
 
             if (dynamicLoad) {
                 try {

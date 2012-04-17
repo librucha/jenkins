@@ -46,8 +46,9 @@ import hudson.util.IOException2;
 import hudson.util.HeadBufferingStream;
 import hudson.util.FormValidation;
 import hudson.util.IOUtils;
+
+import static hudson.Util.*;
 import static hudson.util.jna.GNUCLibrary.LIBC;
-import static hudson.Util.fixEmpty;
 import static hudson.FilePath.TarCompression.GZIP;
 import hudson.org.apache.tools.tar.TarInputStream;
 import hudson.util.io.Archiver;
@@ -75,6 +76,7 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.io.Writer;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
@@ -307,6 +309,10 @@ public final class FilePath implements Serializable {
         return remote.indexOf("\\")==-1;
     }
 
+    /**
+     * Gets the full path of the file on the remote machine.
+     *
+     */
     public String getRemote() {
         return remote;
     }
@@ -327,6 +333,15 @@ public final class FilePath implements Serializable {
         zip(os,(FileFilter)null);
     }
 
+    public void zip(FilePath dst) throws IOException, InterruptedException {
+        OutputStream os = dst.write();
+        try {
+            zip(os);
+        } finally {
+            os.close();
+        }
+    }
+    
     /**
      * Creates a zip file from this directory by using the specified filter,
      * and sends the result to the given output stream.
@@ -400,11 +415,11 @@ public final class FilePath implements Serializable {
         });
     }
 
-    private int archive(final ArchiverFactory factory, OutputStream os, final FileFilter filter) throws IOException, InterruptedException {
+    public int archive(final ArchiverFactory factory, OutputStream os, final FileFilter filter) throws IOException, InterruptedException {
         return archive(factory,os,new DirScanner.Filter(filter));
     }
 
-    private int archive(final ArchiverFactory factory, OutputStream os, final String glob) throws IOException, InterruptedException {
+    public int archive(final ArchiverFactory factory, OutputStream os, final String glob) throws IOException, InterruptedException {
         return archive(factory,os,new DirScanner.Glob(glob,null));
     }
 
@@ -523,6 +538,39 @@ public final class FilePath implements Serializable {
                 return f.getAbsolutePath();
             }
         }));
+    }
+
+    /**
+     * Creates a symlink to the specified target.
+     *
+     * @param target
+     *      The file that the symlink should point to.
+     * @param listener
+     *      If symlink creation requires a help of an external process, the error will be reported here.
+     * @since 1.456
+     */
+    public void symlinkTo(final String target, final TaskListener listener) throws IOException, InterruptedException {
+        act(new FileCallable<Void>() {
+            public Void invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
+                Util.createSymlink(f.getParentFile(),target,f.getName(),listener);
+                return null;
+            }
+        });
+    }
+    
+    /**
+     * Resolves symlink, if the given file is a symlink. Otherwise return null.
+     * <p>
+     * If the resolution fails, report an error.
+     *
+     * @since 1.456
+     */
+    public String readLink() throws IOException, InterruptedException {
+        return act(new FileCallable<String>() {
+            public String invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
+                return Util.resolveSymlink(f);
+            }
+        });
     }
 
     @Override
@@ -939,6 +987,16 @@ public final class FilePath implements Serializable {
 
     /**
      * Creates a temporary file in the directory that this {@link FilePath} object designates.
+     *
+     * @param prefix
+     *      The prefix string to be used in generating the file's name; must be
+     *      at least three characters long
+     * @param suffix
+     *      The suffix string to be used in generating the file's name; may be
+     *      null, in which case the suffix ".tmp" will be used
+     * @return
+     *      The new FilePath pointing to the temporary file
+     * @see File#createTempFile(String, String)
      */
     public FilePath createTempFile(final String prefix, final String suffix) throws IOException, InterruptedException {
         try {
@@ -954,16 +1012,46 @@ public final class FilePath implements Serializable {
     }
 
     /**
-     * Creates a temporary file in this directory and set the contents by the
+     * Creates a temporary file in this directory and set the contents to the
      * given text (encoded in the platform default encoding)
+     *
+     * @param prefix
+     *      The prefix string to be used in generating the file's name; must be
+     *      at least three characters long
+     * @param suffix
+     *      The suffix string to be used in generating the file's name; may be
+     *      null, in which case the suffix ".tmp" will be used
+     * @param contents
+     *      The initial contents of the temporary file.
+     * @return
+     *      The new FilePath pointing to the temporary file
+     * @see File#createTempFile(String, String)
      */
     public FilePath createTextTempFile(final String prefix, final String suffix, final String contents) throws IOException, InterruptedException {
         return createTextTempFile(prefix,suffix,contents,true);
     }
 
     /**
-     * Creates a temporary file in this directory and set the contents by the
-     * given text (encoded in the platform default encoding)
+     * Creates a temporary file in this directory (or the system temporary
+     * directory) and set the contents to the given text (encoded in the
+     * platform default encoding)
+     *
+     * @param prefix
+     *      The prefix string to be used in generating the file's name; must be
+     *      at least three characters long
+     * @param suffix
+     *      The suffix string to be used in generating the file's name; may be
+     *      null, in which case the suffix ".tmp" will be used
+     * @param contents
+     *      The initial contents of the temporary file.
+     * @param inThisDirectory
+     *      If true, then create this temporary in the directory pointed to by
+     *      this.
+     *      If false, then the temporary file is created in the system temporary
+     *      directory (java.io.tmpdir)
+     * @return
+     *      The new FilePath pointing to the temporary file
+     * @see File#createTempFile(String, String)
      */
     public FilePath createTextTempFile(final String prefix, final String suffix, final String contents, final boolean inThisDirectory) throws IOException, InterruptedException {
         try {
@@ -995,7 +1083,17 @@ public final class FilePath implements Serializable {
 
     /**
      * Creates a temporary directory inside the directory represented by 'this'
+     *
+     * @param prefix
+     *      The prefix string to be used in generating the directory's name;
+     *      must be at least three characters long
+     * @param suffix
+     *      The suffix string to be used in generating the directory's name; may
+     *      be null, in which case the suffix ".tmp" will be used
+     * @return
+     *      The new FilePath pointing to the temporary directory
      * @since 1.311
+     * @see File#createTempFile(String, String)
      */
     public FilePath createTempDir(final String prefix, final String suffix) throws IOException, InterruptedException {
         try {
@@ -1702,7 +1800,13 @@ public final class FilePath implements Serializable {
                     File parent = f.getParentFile();
                     if (parent != null) parent.mkdirs();
 
-                    IOUtils.copy(t,f);
+                    byte linkFlag = (Byte) LINKFLAG_FIELD.get(te);
+                    if (linkFlag==TarEntry.LF_SYMLINK) {
+                        new FilePath(f).symlinkTo(te.getLinkName(), TaskListener.NULL);
+                    } else {
+                        IOUtils.copy(t,f);
+                    }
+                    
                     f.setLastModified(te.getModTime().getTime());
                     int mode = te.getMode()&0777;
                     if(mode!=0 && !Functions.isWindows()) // be defensive
@@ -1710,6 +1814,11 @@ public final class FilePath implements Serializable {
                 }
             }
         } catch(IOException e) {
+            throw new IOException2("Failed to extract "+name,e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // process this later
+            throw new IOException2("Failed to extract "+name,e);
+        } catch (IllegalAccessException e) {
             throw new IOException2("Failed to extract "+name,e);
         } finally {
             t.close();
@@ -2070,4 +2179,18 @@ public final class FilePath implements Serializable {
             return o1.length()-o2.length();
         }
     };
+
+    private static final Field LINKFLAG_FIELD = getTarEntryLinkFlagField();
+
+    private static Field getTarEntryLinkFlagField() {
+        try {
+            Field f = TarEntry.class.getDeclaredField("linkFlag");
+            f.setAccessible(true);
+            return f;
+        } catch (SecurityException e) {
+            throw new AssertionError(e);
+        } catch (NoSuchFieldException e) {
+            throw new AssertionError(e);
+        }
+    }
 }

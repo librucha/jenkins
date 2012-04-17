@@ -80,6 +80,8 @@ import hudson.widgets.BuildHistoryWidget;
 import hudson.widgets.HistoryWidget;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import org.kohsuke.accmod.Restricted;
+import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.stapler.ForwardToView;
@@ -90,6 +92,7 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 import org.kohsuke.stapler.export.Exported;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 
 import javax.servlet.ServletException;
 import java.io.File;
@@ -140,7 +143,11 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
 
     /**
      * All the builds keyed by their build number.
+     *
+     * External code should use {@link #getBuildByNumber(int)} or {@link #getLastBuild()} and traverse via
+     * {@link Run#getPreviousBuild()}
      */
+    @Restricted(NoExternalUse.class)
     protected transient /*almost final*/ RunMap<R> builds = new RunMap<R>();
 
     /**
@@ -311,6 +318,21 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
         if(assignedNode==null)
             return Jenkins.getInstance().getSelfLabel();
         return Jenkins.getInstance().getLabel(assignedNode);
+    }
+
+    /**
+     * Set of labels relevant to this job.
+     *
+     * This method is used to determine what slaves are relevant to jobs, for example by {@link View}s.
+     * It does not affect the scheduling. This information is informational and the best-effort basis.
+     *
+     * @since 1.456
+     * @return
+     *      Minimally it should contain {@link #getAssignedLabel()}. The set can contain null element
+     *      to correspond to the null return value from {@link #getAssignedLabel()}.
+     */
+    public Set<Label> getRelevantLabels() {
+        return Collections.singleton(getAssignedLabel());
     }
 
     /**
@@ -1072,7 +1094,8 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
     }
 
     public CauseOfBlockage getCauseOfBlockage() {
-        if (isBuilding() && !isConcurrentBuild())
+        // Block builds until they are done with post-production
+        if (isLogUpdated() && !isConcurrentBuild())
             return new BecauseOfBuildInProgress(getLastBuild());
         if (blockBuildWhenDownstreamBuilding()) {
             AbstractProject<?,?> bup = getBuildingDownstream();
@@ -1640,7 +1663,7 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
      * Cancels a scheduled build.
      */
     public void doCancelQueue( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
-        checkPermission(BUILD);
+        checkPermission(ABORT);
 
         Jenkins.getInstance().getQueue().cancel(this);
         rsp.forwardToPreviousPage(req);
@@ -1650,8 +1673,8 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
      * Deletes this project.
      */
     @Override
+    @RequirePOST
     public void doDoDelete(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException, InterruptedException {
-        requirePOST();
         delete();
         if (req == null || rsp == null)
             return;
@@ -1772,16 +1795,16 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
     }
 
     @CLIMethod(name="disable-job")
+    @RequirePOST
     public HttpResponse doDisable() throws IOException, ServletException {
-        requirePOST();
         checkPermission(CONFIGURE);
         makeDisabled(true);
         return new HttpRedirect(".");
     }
 
     @CLIMethod(name="enable-job")
+    @RequirePOST
     public HttpResponse doEnable() throws IOException, ServletException {
-        requirePOST();
         checkPermission(CONFIGURE);
         makeDisabled(false);
         return new HttpRedirect(".");
@@ -1900,7 +1923,7 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
             return FormValidation.ok();
         }
 
-        public FormValidation doCheckCustomWorkspace(@QueryParameter String customWorkspace){
+        public FormValidation doCheckCustomWorkspace(@QueryParameter(value="customWorkspace.directory") String customWorkspace){
         	if(Util.fixEmptyAndTrim(customWorkspace)==null)
         		return FormValidation.error("Custom workspace is empty");
         	else
@@ -2008,9 +2031,9 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
     private static final Logger LOGGER = Logger.getLogger(AbstractProject.class.getName());
 
     /**
-     * Permission to abort a build. For now, let's make it the same as {@link #BUILD}
+     * Permission to abort a build
      */
-    public static final Permission ABORT = BUILD;
+    public static final Permission ABORT = CANCEL;
 
     /**
      * Replaceable "Build Now" text.
