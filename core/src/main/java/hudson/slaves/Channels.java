@@ -23,11 +23,11 @@
  */
 package hudson.slaves;
 
+import hudson.FilePath;
 import hudson.Launcher.LocalLauncher;
 import hudson.Proc;
-import hudson.FilePath;
-import hudson.model.Computer;
 import hudson.model.TaskListener;
+import hudson.model.Computer;
 import hudson.remoting.Channel;
 import hudson.remoting.Launcher;
 import hudson.remoting.SocketInputStream;

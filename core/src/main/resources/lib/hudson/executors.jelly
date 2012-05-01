@@ -94,6 +94,9 @@ THE SOFTWARE.
                     <a href="${rootURL}/${c.url}${url}/stop"><img src="${imagesURL}/16x16/stop.png" alt="${%terminate this build}" height="16" width="16" /></a>
                   </j:if>
                 </td>
+                <td class="pane" align="center" valign="middle">
+                  <a href="${rootURL}/${c.url}${url}/pause"><img src="${imagesURL}/16x16/pause.png" alt="${%terminate this build}" height="16" width="16" /></a>
+                </td>
               </j:otherwise>
             </j:choose>
           </tr>

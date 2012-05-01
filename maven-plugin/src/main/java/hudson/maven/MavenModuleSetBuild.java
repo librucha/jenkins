@@ -36,23 +36,23 @@ import hudson.maven.reporters.MavenFingerprinter;
 import hudson.maven.reporters.MavenMailer;
 import hudson.maven.settings.SettingConfig;
 import hudson.maven.settings.SettingsProviderUtils;
-import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.Build;
 import hudson.model.BuildListener;
+import hudson.model.Environment;
+import hudson.model.Result;
+import hudson.model.TaskListener;
+import hudson.model.AbstractProject;
 import hudson.model.Cause.UpstreamCause;
 import hudson.model.Computer;
-import hudson.model.Environment;
 import hudson.model.Executor;
 import hudson.model.Fingerprint;
 import hudson.model.Node;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParametersAction;
 import hudson.model.ParametersDefinitionProperty;
-import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.StringParameterDefinition;
-import hudson.model.TaskListener;
 import hudson.remoting.VirtualChannel;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStep;
@@ -126,9 +126,12 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
     private String mavenVersionUsed;
 
     private transient Object notifyModuleBuildLock = new Object();
+    
+    private transient Executor executor;
 
     public MavenModuleSetBuild(MavenModuleSet job) throws IOException {
         super(job);
+        this.executor = Executor.currentExecutor();
     }
 
     public MavenModuleSetBuild(MavenModuleSet project, File buildDir) throws IOException {
@@ -139,6 +142,10 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
     protected void onLoad() {
         super.onLoad();
         notifyModuleBuildLock = new Object();
+    }
+    
+    public Executor getExecutor() {
+      return executor;
     }
 
     /**
@@ -714,6 +721,7 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                                                                   new MavenProcessFactory( project, launcher, envVars,getMavenOpts(listener, envVars),
                                                                                            pom.getParent() ) );
                         }
+                        executor.setChannel(process.getChannel());
                         ArgumentListBuilder margs = new ArgumentListBuilder().add("-B").add("-f", pom.getRemote());
                         FilePath localRepo = project.getLocalRepository().locate(MavenModuleSetBuild.this);
                         if(localRepo!=null)
