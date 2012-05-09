@@ -71,7 +71,9 @@ THE SOFTWARE.
                 <j:set var="executor" value="${e}" />
                 <st:include it="${e.currentExecutable}" page="executorCell.jelly" optional="true">
                   <td class="pane">
-                    <div style="white-space: normal">${%Building}
+                    <div style="white-space: normal">&#160;
+                      <j:if test="${!e.isPaused()}">${%Building}</j:if>
+                      <j:if test="${e.isPaused()}">${%Paused}</j:if>
                       <j:set var="exe" value="${e.currentExecutable}" />
                       <j:invokeStatic var="exeparent"
                          className="hudson.model.queue.Executables" method="getParentOf">
@@ -92,10 +94,16 @@ THE SOFTWARE.
                 <td class="pane" align="center" valign="middle">
                   <j:if test="${e.hasStopPermission()}">
                     <a href="${rootURL}/${c.url}${url}/stop"><img src="${imagesURL}/16x16/stop.png" alt="${%terminate this build}" height="16" width="16" /></a>
+                    <j:if test="${e.canShowPauseOrCont()}">
+                      &#160;
+                      <j:if test="${e.isPaused()}">
+                        <a href="${rootURL}/${c.url}${url}/cont"><img src="${imagesURL}/16x16/cont.png" alt="${%pause this build}" height="16" width="16" /></a>
+                      </j:if>
+                      <j:if test="${!e.isPaused()}">
+                        <a href="${rootURL}/${c.url}${url}/pause"><img src="${imagesURL}/16x16/pause.png" alt="${%continue this build}" height="16" width="16" /></a>
+                      </j:if>
+                    </j:if>
                   </j:if>
-                </td>
-                <td class="pane" align="center" valign="middle">
-                  <a href="${rootURL}/${c.url}${url}/pause"><img src="${imagesURL}/16x16/pause.png" alt="${%terminate this build}" height="16" width="16" /></a>
                 </td>
               </j:otherwise>
             </j:choose>

@@ -252,6 +252,10 @@ public class Queue extends ResourceController implements Saveable {
     public LoadBalancer getLoadBalancer() {
         return loadBalancer;
     }
+    
+    public Map<Executor, JobOffer> getParked() {
+      return parked;
+    }
 
     public void setLoadBalancer(LoadBalancer loadBalancer) {
         if(loadBalancer==null)  throw new IllegalArgumentException();

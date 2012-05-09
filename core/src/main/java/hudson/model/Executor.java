@@ -33,6 +33,8 @@ import hudson.model.queue.SubTask;
 import hudson.model.queue.Tasks;
 import hudson.model.queue.WorkUnit;
 import hudson.remoting.Channel;
+import hudson.remoting.LocalChannel;
+import hudson.remoting.VirtualChannel;
 import hudson.security.ACL;
 import hudson.util.InterceptingProxy;
 import hudson.util.TimeUnit2;
@@ -70,8 +72,8 @@ import org.kohsuke.stapler.export.ExportedBean;
 public class Executor extends Thread implements ModelObject {
   protected final Computer owner;
   private final Queue queue;
-  
-  private Channel currentChannel;
+
+  private VirtualChannel currentChannel;
 
   private long startTime;
   /**
@@ -116,8 +118,8 @@ public class Executor extends Thread implements ModelObject {
   public void interrupt() {
     interrupt(Result.ABORTED);
   }
-  
-  public void setChannel(Channel channel){
+
+  public void setChannel(Channel channel) {
     this.currentChannel = channel;
   }
 
@@ -509,15 +511,37 @@ public class Executor extends Thread implements ModelObject {
   }
 
   public void doPause(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException, InterruptedException {
-    
-    if (!currentChannel.isPaused()){
+    pauseOrCont();
+    rsp.forwardToPreviousPage(req);
+  }
+
+  public void doCont(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException, InterruptedException {
+    pauseOrCont();
+    rsp.forwardToPreviousPage(req);
+  }
+
+  public void pauseOrCont() {
+    if (currentChannel == null) {
+      currentChannel = Jenkins.getInstance().getChannel();
+    }
+
+    if (!currentChannel.isPaused()) {
       currentChannel.pause();
     }
     else {
       currentChannel.cont();
     }
+  }
 
-    rsp.forwardToPreviousPage(req);
+  public boolean isPaused() {
+    if (currentChannel != null) {
+      return currentChannel.isPaused();
+    }
+    return false;
+  }
+
+  public boolean canShowPauseOrCont() {
+    return (currentChannel != null && !(currentChannel instanceof LocalChannel));
   }
 
   /**
