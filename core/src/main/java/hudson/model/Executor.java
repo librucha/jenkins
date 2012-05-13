@@ -33,7 +33,6 @@ import hudson.model.queue.SubTask;
 import hudson.model.queue.Tasks;
 import hudson.model.queue.WorkUnit;
 import hudson.remoting.Channel;
-import hudson.remoting.LocalChannel;
 import hudson.remoting.VirtualChannel;
 import hudson.security.ACL;
 import hudson.util.InterceptingProxy;
@@ -73,6 +72,9 @@ public class Executor extends Thread implements ModelObject {
   protected final Computer owner;
   private final Queue queue;
 
+  /**
+   * Channel assigned with this executor. If is executor idle, channel is null.
+   */
   private VirtualChannel currentChannel;
 
   private long startTime;
@@ -119,7 +121,7 @@ public class Executor extends Thread implements ModelObject {
     interrupt(Result.ABORTED);
   }
 
-  public void setChannel(Channel channel) {
+  public void setChannel(VirtualChannel channel) {
     this.currentChannel = channel;
   }
 
@@ -150,6 +152,9 @@ public class Executor extends Thread implements ModelObject {
         if (!this.causes.contains(c))
           this.causes.add(c);
       }
+    }
+    if (isPaused()){ // unblock
+      cont();
     }
     super.interrupt();
   }
@@ -272,6 +277,9 @@ public class Executor extends Thread implements ModelObject {
             continue;
           }
           finally {
+            if (isPaused()){ // unblock
+              cont();
+            }
             workUnit.setExecutor(null);
           }
         }
@@ -511,24 +519,23 @@ public class Executor extends Thread implements ModelObject {
   }
 
   public void doPause(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException, InterruptedException {
-    pauseOrCont();
+    pause();
     rsp.forwardToPreviousPage(req);
   }
 
   public void doCont(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException, InterruptedException {
-    pauseOrCont();
+    cont();
     rsp.forwardToPreviousPage(req);
   }
-
-  public void pauseOrCont() {
-    if (currentChannel == null) {
-      currentChannel = Jenkins.getInstance().getChannel();
-    }
-
-    if (!currentChannel.isPaused()) {
+  
+  public void pause() {
+    if (currentChannel != null){
       currentChannel.pause();
     }
-    else {
+  }
+  
+  public void cont() {
+    if (currentChannel != null){
       currentChannel.cont();
     }
   }
@@ -540,8 +547,8 @@ public class Executor extends Thread implements ModelObject {
     return false;
   }
 
-  public boolean canShowPauseOrCont() {
-    return (currentChannel != null && !(currentChannel instanceof LocalChannel));
+  public boolean supportPausing() {
+    return (currentChannel != null && currentChannel instanceof Channel);
   }
 
   /**

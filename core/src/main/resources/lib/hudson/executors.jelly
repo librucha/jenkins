@@ -94,7 +94,7 @@ THE SOFTWARE.
                 <td class="pane" align="center" valign="middle">
                   <j:if test="${e.hasStopPermission()}">
                     <a href="${rootURL}/${c.url}${url}/stop"><img src="${imagesURL}/16x16/stop.png" alt="${%terminate this build}" height="16" width="16" /></a>
-                    <j:if test="${e.canShowPauseOrCont()}">
+                    <j:if test="${e.supportPausing()}">
                       &#160;
                       <j:if test="${e.isPaused()}">
                         <a href="${rootURL}/${c.url}${url}/cont"><img src="${imagesURL}/16x16/cont.png" alt="${%pause this build}" height="16" width="16" /></a>
