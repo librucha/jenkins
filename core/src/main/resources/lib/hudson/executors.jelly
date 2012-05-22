@@ -72,8 +72,8 @@ THE SOFTWARE.
                 <st:include it="${e.currentExecutable}" page="executorCell.jelly" optional="true">
                   <td class="pane">
                     <div style="white-space: normal">&#160;
-                      <j:if test="${!e.isPaused()}">${%Building}</j:if>
-                      <j:if test="${e.isPaused()}">${%Paused}</j:if>
+                      <j:if test="${!e.isPaused()}">${%Building}&#160;</j:if>
+                      <j:if test="${e.isPaused()}">${%Paused}&#160;</j:if>
                       <j:set var="exe" value="${e.currentExecutable}" />
                       <j:invokeStatic var="exeparent"
                          className="hudson.model.queue.Executables" method="getParentOf">

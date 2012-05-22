@@ -524,7 +524,7 @@ public abstract class AbstractBuild<P extends AbstractProject<P,R>,R extends Abs
         protected Launcher createLauncher(BuildListener listener) throws IOException, InterruptedException {
             Launcher l = getCurrentNode().createLauncher(listener);
             
-            Executor.currentExecutor().setChannel(l.getChannel());
+//            Executor.currentExecutor().setChannel(l.getChannel());
 
             if (project instanceof BuildableItemWithBuildWrappers) {
                 BuildableItemWithBuildWrappers biwbw = (BuildableItemWithBuildWrappers) project;

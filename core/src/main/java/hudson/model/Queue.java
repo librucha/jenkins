@@ -24,45 +24,44 @@
  */
 package hudson.model;
 
+import static hudson.init.InitMilestone.JOB_LOADED;
+import static hudson.util.Iterators.reverse;
 import hudson.AbortException;
 import hudson.BulkChange;
 import hudson.ExtensionList;
 import hudson.ExtensionPoint;
 import hudson.Util;
 import hudson.XmlFile;
-import hudson.init.Initializer;
-import static hudson.init.InitMilestone.JOB_LOADED;
-import static hudson.util.Iterators.reverse;
-
 import hudson.cli.declarative.CLIMethod;
 import hudson.cli.declarative.CLIResolver;
+import hudson.init.Initializer;
+import hudson.model.Node.Mode;
 import hudson.model.labels.LabelAssignmentAction;
+import hudson.model.listeners.SaveableListener;
 import hudson.model.queue.AbstractQueueTask;
 import hudson.model.queue.Executables;
-import hudson.model.queue.SubTask;
+import hudson.model.queue.FoldableAction;
 import hudson.model.queue.FutureImpl;
 import hudson.model.queue.MappingWorksheet;
 import hudson.model.queue.MappingWorksheet.Mapping;
 import hudson.model.queue.QueueSorter;
 import hudson.model.queue.QueueTaskDispatcher;
+import hudson.model.queue.SubTask;
 import hudson.model.queue.Tasks;
 import hudson.model.queue.WorkUnit;
-import hudson.model.Node.Mode;
-import hudson.model.listeners.SaveableListener;
+import hudson.model.queue.WorkUnitContext;
 import hudson.model.queue.CauseOfBlockage;
-import hudson.model.queue.FoldableAction;
 import hudson.model.queue.CauseOfBlockage.BecauseLabelIsBusy;
-import hudson.model.queue.CauseOfBlockage.BecauseNodeIsOffline;
 import hudson.model.queue.CauseOfBlockage.BecauseLabelIsOffline;
 import hudson.model.queue.CauseOfBlockage.BecauseNodeIsBusy;
-import hudson.model.queue.WorkUnitContext;
+import hudson.model.queue.CauseOfBlockage.BecauseNodeIsOffline;
 import hudson.triggers.SafeTimerTask;
 import hudson.triggers.Trigger;
+import hudson.util.ConsistentHash;
+import hudson.util.ConsistentHash.Hash;
 import hudson.util.OneShotEvent;
 import hudson.util.TimeUnit2;
 import hudson.util.XStream2;
-import hudson.util.ConsistentHash;
-import hudson.util.ConsistentHash.Hash;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -81,12 +80,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -94,6 +93,7 @@ import javax.management.timer.Timer;
 import javax.servlet.ServletException;
 
 import jenkins.model.Jenkins;
+
 import org.acegisecurity.AccessDeniedException;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses;
